@@ -17,6 +17,7 @@ package org.traccar.api.resource;
 
 import jakarta.ws.rs.FormParam;
 import org.traccar.api.BaseObjectResource;
+import org.traccar.api.security.ServiceAccountUser;
 import org.traccar.api.signature.TokenManager;
 import org.traccar.broadcast.BroadcastService;
 import org.traccar.database.MediaManager;
@@ -33,6 +34,8 @@ import org.traccar.storage.query.Columns;
 import org.traccar.storage.query.Condition;
 import org.traccar.storage.query.Request;
 
+import jakarta.ws.rs.core.Response.Status;
+import jakarta.annotation.security.PermitAll;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -54,6 +57,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.UUID;
 
 @Path("devices")
 @Produces(MediaType.APPLICATION_JSON)
@@ -86,7 +90,6 @@ public class DeviceResource extends BaseObjectResource<Device> {
             @QueryParam("id") List<Long> deviceIds) throws StorageException {
 
         if (!uniqueIds.isEmpty() || !deviceIds.isEmpty()) {
-
             List<Device> result = new LinkedList<>();
             for (String uniqueId : uniqueIds) {
                 result.addAll(storage.getObjects(Device.class, new Request(
@@ -124,6 +127,50 @@ public class DeviceResource extends BaseObjectResource<Device> {
             return storage.getObjects(baseClass, new Request(new Columns.All(), Condition.merge(conditions)));
 
         }
+    }
+
+	@PermitAll
+	@Path("/public/{userPublicId}")
+	@POST
+    public Response add(
+		@PathParam("userPublicId") long userPublicId,
+		Device device
+	) throws Exception {
+		
+
+		List<User> users = storage.getObjects(
+			User.class,
+			new Request(
+            	new Columns.Include("id"),
+                new Condition.Equals("publicId", userPublicId)
+            )
+		);
+
+		if (users.size() == 1) {
+			User user = users.get(0);
+
+			String uniqueID = UUID.randomUUID().toString();
+			device.setUniqueId(uniqueID);
+
+        	permissionsService.checkEdit(user.getId(), device, true);
+
+			device.setId(storage.addObject(device, new Request(new Columns.Exclude("id"))));
+			LogAction.create(user.getId(), device);
+
+			if (user.getId() != ServiceAccountUser.ID) {
+				storage.addPermission(new Permission(User.class, user.getId(), baseClass, device.getId()));
+				cacheManager.invalidatePermission(true, User.class, user.getId(), baseClass, device.getId(), true);
+				connectionManager.invalidatePermission(true, User.class, user.getId(), baseClass, device.getId(), true);
+				LogAction.link(user.getId(), User.class, user.getId(), baseClass, device.getId());
+			}
+
+			return Response.ok(device).build();
+
+		} else if (users.size() == 0) {
+			return Response.status(Status.NOT_FOUND).build();
+		} else {
+			return Response.serverError().build();
+		}
     }
 
     @Path("{id}/accumulators")

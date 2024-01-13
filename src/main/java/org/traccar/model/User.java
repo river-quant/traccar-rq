@@ -315,4 +315,14 @@ public class User extends ExtendedModel implements UserRestrictions, Disableable
         return Hashing.validatePassword(password, hashedPassword, salt);
     }
 
+	private long publicId;
+
+	public long getPublicId() {
+		return this.publicId;
+	}
+
+	public void setPublicId(long publicId) {
+		this.publicId = publicId;
+	}
+
 }
