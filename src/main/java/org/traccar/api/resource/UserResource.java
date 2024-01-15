@@ -44,6 +44,7 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.Collection;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Path("users")
 @Produces(MediaType.APPLICATION_JSON)
@@ -80,6 +81,11 @@ public class UserResource extends BaseObjectResource<User> {
     @PermitAll
     @POST
     public Response add(User entity) throws StorageException {
+		int min = 10000000;
+		int max = 99999999;
+		long userPublicId = ThreadLocalRandom.current().nextLong(min, max + 1);
+		entity.setPublicId(userPublicId);
+	
         User currentUser = getUserId() > 0 ? permissionsService.getUser(getUserId()) : null;
         if (currentUser == null || !currentUser.getAdministrator()) {
             permissionsService.checkUserUpdate(getUserId(), new User(), entity);

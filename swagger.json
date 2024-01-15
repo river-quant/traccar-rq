@@ -2808,7 +2808,10 @@
           "attributes": {
             "type": "object",
             "properties": {}
-          }
+          },
+		  "publicId": {
+			"type": "long"
+		  }
         }
       },
       "Server": {
